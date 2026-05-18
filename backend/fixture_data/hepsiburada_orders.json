@@ -1,0 +1,28 @@
+[
+  {
+    "marketplace_order_id": "HB-2026-0089",
+    "status": "Delivered",
+    "is_return": false,
+    "customer": {
+      "name": "Doğuş Teknoloji A.Ş.",
+      "tax_id": "3450987612",
+      "is_company": true,
+      "city": "İstanbul"
+    },
+    "lines": [
+      {
+        "product_name": "Samsung 27\" LS27A400UJUXUF IPS 75Hz Monitör",
+        "category": "Bilgisayar & Tablet",
+        "barcode": "8806094958485",
+        "quantity": 2,
+        "unit_price": 6499.00
+      }
+    ],
+    "gross_amount": 12998.00,
+    "commission": 1039.84,
+    "shipping_cost": 0.00,
+    "campaign_discount": 0.00,
+    "net_payout": 11958.16,
+    "order_date": "2026-05-15T13:00:00"
+  }
+]

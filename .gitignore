@@ -1,0 +1,6 @@
+backend/.env
+backend/pazarmuhasebe.db
+__pycache__/
+*.pyc
+node_modules/
+.next/

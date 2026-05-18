@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"C:\\\\Users\\\\Yagiz\\\\Desktop\\\\app test 1\\\\CLAUDE DENEMELER\\\\btk-hackathon\\\\frontend\")",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --eslint --yes)",
+      "Bash(npm install *)"
+    ]
+  }
+}

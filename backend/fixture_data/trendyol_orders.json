@@ -1,0 +1,184 @@
+[
+  {
+    "marketplace_order_id": "TY-2026-0051",
+    "status": "Delivered",
+    "is_return": false,
+    "customer": {
+      "name": "Ahmet Yılmaz",
+      "tax_id": null,
+      "is_company": false,
+      "city": "İstanbul"
+    },
+    "lines": [
+      {
+        "product_name": "Nike Air Max 270 Erkek Spor Ayakkabı Siyah",
+        "category": "Ayakkabı & Çanta",
+        "barcode": "8901234567890",
+        "quantity": 1,
+        "unit_price": 2499.00
+      }
+    ],
+    "gross_amount": 2499.00,
+    "commission": 299.88,
+    "shipping_cost": 0.00,
+    "campaign_discount": 0.00,
+    "net_payout": 2199.12,
+    "order_date": "2026-05-14T14:23:00"
+  },
+  {
+    "marketplace_order_id": "TY-2026-0052",
+    "status": "Delivered",
+    "is_return": false,
+    "customer": {
+      "name": "Fatma Kaya",
+      "tax_id": null,
+      "is_company": false,
+      "city": "Ankara"
+    },
+    "lines": [
+      {
+        "product_name": "Philips HR2204/00 Blender 600W Plastik Hazne",
+        "category": "Küçük Ev Aletleri",
+        "barcode": "8710103758861",
+        "quantity": 1,
+        "unit_price": 899.00
+      }
+    ],
+    "gross_amount": 899.00,
+    "commission": 89.90,
+    "shipping_cost": 0.00,
+    "campaign_discount": 50.00,
+    "net_payout": 759.10,
+    "order_date": "2026-05-14T16:45:00"
+  },
+  {
+    "marketplace_order_id": "TY-2026-0053",
+    "status": "Delivered",
+    "is_return": false,
+    "customer": {
+      "name": "Zeynep Arslan",
+      "tax_id": null,
+      "is_company": false,
+      "city": "İzmir"
+    },
+    "lines": [
+      {
+        "product_name": "Aptamil 3 Devam Sütü 800gr (1-3 Yaş)",
+        "category": "Anne & Bebek",
+        "barcode": "5900852030710",
+        "quantity": 2,
+        "unit_price": 340.00
+      }
+    ],
+    "gross_amount": 680.00,
+    "commission": 54.40,
+    "shipping_cost": 0.00,
+    "campaign_discount": 0.00,
+    "net_payout": 625.60,
+    "order_date": "2026-05-15T09:12:00"
+  },
+  {
+    "marketplace_order_id": "TY-2026-0054",
+    "status": "Delivered",
+    "is_return": false,
+    "customer": {
+      "name": "Mehmet Öztürk",
+      "tax_id": null,
+      "is_company": false,
+      "city": "Bursa"
+    },
+    "lines": [
+      {
+        "product_name": "L'Oreal Paris Excellence Creme Saç Boyası 7.1 Kumral Küllü",
+        "category": "Kozmetik & Kişisel Bakım",
+        "barcode": "3600520248084",
+        "quantity": 3,
+        "unit_price": 189.00
+      }
+    ],
+    "gross_amount": 567.00,
+    "commission": 85.05,
+    "shipping_cost": 0.00,
+    "campaign_discount": 0.00,
+    "net_payout": 481.95,
+    "order_date": "2026-05-15T11:30:00"
+  },
+  {
+    "marketplace_order_id": "TY-2026-0055",
+    "status": "Delivered",
+    "is_return": false,
+    "customer": {
+      "name": "Elif Şahin",
+      "tax_id": null,
+      "is_company": false,
+      "city": "Antalya"
+    },
+    "lines": [
+      {
+        "product_name": "Alüminyum Laptop Standı Yükseklik Ayarlı 11-17 inç Uyumlu",
+        "category": "Bilgisayar & Tablet Aksesuarları",
+        "barcode": "7492038561049",
+        "quantity": 1,
+        "unit_price": 450.00
+      }
+    ],
+    "gross_amount": 450.00,
+    "commission": 54.00,
+    "shipping_cost": 0.00,
+    "campaign_discount": 0.00,
+    "net_payout": 396.00,
+    "order_date": "2026-05-16T08:55:00"
+  },
+  {
+    "marketplace_order_id": "TY-2026-0042-R",
+    "status": "Returned",
+    "is_return": true,
+    "customer": {
+      "name": "Ahmet Yılmaz",
+      "tax_id": null,
+      "is_company": false,
+      "city": "İstanbul"
+    },
+    "lines": [
+      {
+        "product_name": "Nike Air Max 270 Erkek Spor Ayakkabı Siyah",
+        "category": "Ayakkabı & Çanta",
+        "barcode": "8901234567890",
+        "quantity": 1,
+        "unit_price": 2499.00
+      }
+    ],
+    "gross_amount": -2499.00,
+    "commission": -299.88,
+    "shipping_cost": 0.00,
+    "campaign_discount": 0.00,
+    "net_payout": -2199.12,
+    "order_date": "2026-05-13T17:30:00"
+  },
+  {
+    "marketplace_order_id": "TY-2026-0038-R",
+    "status": "Returned",
+    "is_return": true,
+    "customer": {
+      "name": "Selin Demirci",
+      "tax_id": null,
+      "is_company": false,
+      "city": "Kocaeli"
+    },
+    "lines": [
+      {
+        "product_name": "Tefal Comfort Max Tava Seti 24-28cm PFOA'sız",
+        "category": "Mutfak & Ev",
+        "barcode": "3168430123456",
+        "quantity": 1,
+        "unit_price": 1250.00
+      }
+    ],
+    "gross_amount": -1250.00,
+    "commission": -150.00,
+    "shipping_cost": 0.00,
+    "campaign_discount": 0.00,
+    "net_payout": -1100.00,
+    "order_date": "2026-05-12T10:15:00"
+  }
+]

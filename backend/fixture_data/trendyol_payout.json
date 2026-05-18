@@ -1,0 +1,17 @@
+{
+  "marketplace": "Trendyol",
+  "period": "Mayıs 2026 (1-16)",
+  "payment_date": "2026-05-16",
+  "payout_lines": [
+    { "description": "Satış Gelirleri", "amount": 5095.00 },
+    { "description": "Komisyon Kesintisi", "amount": -583.23 },
+    { "description": "Kargo Desteği", "amount": 0.00 },
+    { "description": "Kampanya Katılım Kesintisi", "amount": -50.00 },
+    { "description": "İade Geri Ödemesi", "amount": -3299.12 },
+    { "description": "Stopaj Kesintisi (%2)", "amount": -101.90 },
+    { "description": "Mutabakat Düzeltmesi", "amount": -23.50 }
+  ],
+  "actual_payout": 1037.25,
+  "currency": "TRY",
+  "notes": "Stopaj oranı Mayıs 2026 itibarıyla %2 olarak uygulanmıştır. Kampanya kesintisi TY-2026-0052 numaralı siparişe aittir."
+}
