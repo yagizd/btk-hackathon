@@ -7,6 +7,7 @@ import OrdersTable from "@/src/components/OrdersTable";
 import NLQueryBox from "@/src/components/NLQueryBox";
 import Sidebar from "@/src/components/Sidebar";
 import SalesChart from "@/src/components/SalesChart";
+import UncertainReview from "@/src/components/UncertainReview";
 
 const TRY = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 
@@ -94,6 +95,11 @@ export default function Home() {
         <section id="orders" className="mb-8">
           <h2 className="text-lg font-semibold text-gray-700 mb-3">Siparişler</h2>
           <OrdersTable />
+        </section>
+
+        {/* Uncertain Review */}
+        <section className="mb-8">
+          <UncertainReview />
         </section>
 
         {/* NL Query */}

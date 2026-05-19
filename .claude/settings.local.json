@@ -3,7 +3,9 @@
     "allow": [
       "Bash(mkdir -p \"C:\\\\Users\\\\Yagiz\\\\Desktop\\\\app test 1\\\\CLAUDE DENEMELER\\\\btk-hackathon\\\\frontend\")",
       "Bash(npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --eslint --yes)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(python *)",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" -d \"{\\\\\"question\\\\\":\\\\\"Bu ay en cok satan urun nedir?\\\\\"}\" http://127.0.0.1:8000/api/nl-query)"
     ]
   }
 }

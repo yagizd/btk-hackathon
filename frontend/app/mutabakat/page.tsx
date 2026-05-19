@@ -3,9 +3,34 @@
 import { useEffect, useState } from "react";
 import { fetchReconciliation, Reconciliation } from "@/src/lib/api";
 import Sidebar from "@/src/components/Sidebar";
+import PayoutWaterfall from "@/src/components/PayoutWaterfall";
 
 
 const TRY = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
+
+const SEVERITY_STYLE: Record<string, { bg: string; border: string; text: string; label: string; icon: string }> = {
+  low:    { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", label: "Düşük risk", icon: "●" },
+  medium: { bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-800",   label: "Orta risk",  icon: "▲" },
+  high:   { bg: "bg-red-50",     border: "border-red-200",     text: "text-red-800",     label: "Yüksek risk", icon: "⚠" },
+};
+
+const ROOT_CAUSE_LABEL: Record<string, string> = {
+  commission_outlier:  "Komisyon Sapması",
+  campaign_kesinti:    "Kampanya Kesintisi",
+  return_refund:       "İade Geri Ödemesi",
+  stopaj_adjustment:   "Stopaj Düzenlemesi",
+  missing_line_item:   "Eksik Kalem",
+  rounding:            "Yuvarlama",
+  multiple:            "Birden Fazla Neden",
+  unknown:             "Belirsiz",
+};
+
+const COMM_STATUS_STYLE: Record<string, { dot: string; label: string }> = {
+  normal:           { dot: "bg-emerald-500", label: "Normal" },
+  borderline:       { dot: "bg-amber-400",   label: "Sınırda" },
+  unusually_low:    { dot: "bg-blue-500",    label: "Beklenenin Altında" },
+  unusually_high:   { dot: "bg-red-500",     label: "Beklenenin Üstünde" },
+};
 
 export default function MutabakatPage() {
   const [data, setData] = useState<Reconciliation | null>(null);
@@ -41,6 +66,36 @@ export default function MutabakatPage() {
           </div>
         ) : data ? (
           <div className="space-y-6 max-w-3xl">
+            {/* Severity Banner */}
+            {data.severity && (
+              <div
+                className={`rounded-xl border p-4 flex items-start gap-3 ${
+                  SEVERITY_STYLE[data.severity].bg
+                } ${SEVERITY_STYLE[data.severity].border}`}
+              >
+                <span className={`text-xl ${SEVERITY_STYLE[data.severity].text}`}>
+                  {SEVERITY_STYLE[data.severity].icon}
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`font-semibold text-sm ${SEVERITY_STYLE[data.severity].text}`}>
+                      {SEVERITY_STYLE[data.severity].label}
+                    </span>
+                    {data.root_cause && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full bg-white/60 ${SEVERITY_STYLE[data.severity].text}`}>
+                        {ROOT_CAUSE_LABEL[data.root_cause] ?? data.root_cause}
+                      </span>
+                    )}
+                  </div>
+                  {data.suggested_action && (
+                    <p className={`text-sm ${SEVERITY_STYLE[data.severity].text}`}>
+                      <span className="font-medium">Önerilen aksiyon:</span> {data.suggested_action}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Özet Kart */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-4">
@@ -101,6 +156,11 @@ export default function MutabakatPage() {
               </div>
             )}
 
+            {/* Payout Waterfall (Gemini per-line analysis) */}
+            {data.waterfall && data.waterfall.length > 0 && (
+              <PayoutWaterfall lines={data.waterfall} />
+            )}
+
             {/* Ödeme Kalemleri */}
             {data.payout_lines && data.payout_lines.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -119,6 +179,54 @@ export default function MutabakatPage() {
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Komisyon Bandı Kontrolü */}
+            {data.commission_check && data.commission_check.checks.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700">Komisyon Bandı Kontrolü</h3>
+                  <span className="text-xs text-gray-500">
+                    {data.commission_check.out_of_band_count} / {data.commission_check.total} bant dışı
+                  </span>
+                </div>
+                <div className="overflow-x-auto -mx-2">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-gray-500 text-xs uppercase tracking-wide">
+                        <th className="px-2 py-2 text-left">Sipariş</th>
+                        <th className="px-2 py-2 text-left">Kategori</th>
+                        <th className="px-2 py-2 text-right">Komisyon</th>
+                        <th className="px-2 py-2 text-right">Beklenen Bant</th>
+                        <th className="px-2 py-2 text-left">Durum</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.commission_check.checks.map((c, i) => {
+                        const style = COMM_STATUS_STYLE[c.status] ?? COMM_STATUS_STYLE.normal;
+                        return (
+                          <tr key={i} className={c.status === "unusually_high" || c.status === "unusually_low" ? "bg-red-50/40" : ""}>
+                            <td className="px-2 py-2 font-mono text-xs text-gray-700">{c.order_id ?? "-"}</td>
+                            <td className="px-2 py-2 text-gray-600 text-xs">{c.category ?? "-"}</td>
+                            <td className="px-2 py-2 text-right font-mono text-xs text-gray-800">
+                              %{(c.actual_rate * 100).toFixed(1)}
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono text-xs text-gray-500">
+                              %{(c.expected_band[0] * 100).toFixed(0)}–%{(c.expected_band[1] * 100).toFixed(0)}
+                            </td>
+                            <td className="px-2 py-2 text-xs">
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+                                <span className="text-gray-700">{style.label}</span>
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

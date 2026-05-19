@@ -7,7 +7,9 @@ const NAV_ITEMS = [
   { label: "Dashboard", href: "/" },
   { label: "Siparişler", href: "/#orders" },
   { label: "Faturalar", href: "/faturalar" },
+  { label: "İadeler", href: "/iadeler" },
   { label: "Mutabakat", href: "/mutabakat" },
+  { label: "Fatura Yükle", href: "/yukle" },
 ];
 
 export default function Sidebar() {

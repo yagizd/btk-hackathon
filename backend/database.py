@@ -19,6 +19,16 @@ def get_db():
         conn.close()
 
 
+def _migrate(conn):
+    """Mevcut DB'lerde eksik kolonları güvenli şekilde ekler."""
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(order_lines)").fetchall()}
+    if "gemini_alternatives" not in existing:
+        try:
+            conn.execute("ALTER TABLE order_lines ADD COLUMN gemini_alternatives TEXT")
+        except Exception:
+            pass
+
+
 def init_db():
     with get_db() as conn:
         conn.executescript("""
@@ -54,6 +64,7 @@ def init_db():
                 gemini_account_name TEXT,
                 gemini_reasoning TEXT,
                 gemini_confidence REAL,
+                gemini_alternatives TEXT,         -- JSON: [{kdv_orani, hesap_kodu, hesap_adi, gerekce, guven_skoru}]
                 user_approved INTEGER,
                 approved_at TEXT
             );
@@ -72,4 +83,24 @@ def init_db():
                 key TEXT PRIMARY KEY,
                 value TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT NOT NULL,
+                turn INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (session_id, turn)
+            );
+
+            CREATE TABLE IF NOT EXISTS return_classifications (
+                order_id INTEGER PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+                reason TEXT,                    -- damaged | wrong_item | size_fit | preference | late_delivery | quality | other
+                refund_category TEXT,           -- cash_refund | replacement | partial_refund | warranty
+                kdv_adjustment_needed INTEGER DEFAULT 0,
+                gemini_explanation TEXT,
+                gemini_confidence REAL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
         """)
+        _migrate(conn)

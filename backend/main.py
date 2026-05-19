@@ -6,6 +6,7 @@ from routers.invoices import router as invoices_router
 from routers.reconciliation import router as reconciliation_router
 from routers.nl_query import router as nl_query_router
 from routers.dashboard import router as dashboard_router
+from routers.returns import router as returns_router
 
 app = FastAPI(
     title="PazarMuhasebe API",
@@ -26,6 +27,7 @@ app.include_router(invoices_router)
 app.include_router(reconciliation_router)
 app.include_router(nl_query_router)
 app.include_router(dashboard_router)
+app.include_router(returns_router)
 
 
 @app.on_event("startup")
