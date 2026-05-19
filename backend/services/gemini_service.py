@@ -53,7 +53,7 @@ def smart_fallback(product_name: str) -> dict:
                 "kdv_orani": 1,
                 "hesap_kodu": "153",
                 "hesap_adi": "Ticari Mallar",
-                "gemini_reasoning": "Temel gıda maddesi — KDV %1 uygulanır.",
+                "gerekce": "Temel gida maddesi - KDV %1 uygulanir.",
                 "guven_skoru": 0.85
             }
 
@@ -63,7 +63,7 @@ def smart_fallback(product_name: str) -> dict:
                 "kdv_orani": 10,
                 "hesap_kodu": "153",
                 "hesap_adi": "Ticari Mallar",
-                "gemini_reasoning": "İndirimli KDV kategorisi — %10 uygulanır.",
+                "gerekce": "Indirimli KDV kategorisi - %10 uygulanir.",
                 "guven_skoru": 0.80
             }
 
@@ -71,7 +71,7 @@ def smart_fallback(product_name: str) -> dict:
         "kdv_orani": 20,
         "hesap_kodu": "153",
         "hesap_adi": "Ticari Mallar",
-        "gemini_reasoning": "Genel tüketim malı — standart KDV %20 uygulanır.",
+        "gerekce": "Genel tuketim mali - standart KDV %20 uygulanir.",
         "guven_skoru": 0.75
     }
 

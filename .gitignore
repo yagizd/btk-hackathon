@@ -1,6 +1,14 @@
 backend/.env
 backend/pazarmuhasebe.db
+backend/uvicorn.log
+backend/uvicorn_err.log
+backend/uvicorn_out.log
 __pycache__/
 *.pyc
+*.pyo
 node_modules/
 .next/
+.turbo/
+frontend/.next/
+frontend/node_modules/
+frontend/tsconfig.tsbuildinfo

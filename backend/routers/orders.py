@@ -148,11 +148,11 @@ def classify_order(order_id: int):
                    gemini_reasoning=?, gemini_confidence=?
                    WHERE id=?""",
                 (
-                    result["kdv_orani"],
-                    result["hesap_kodu"],
-                    result["hesap_adi"],
-                    result["gerekce"],
-                    result["guven_skoru"],
+                    result.get("kdv_orani", 20),
+                    result.get("hesap_kodu", "153"),
+                    result.get("hesap_adi", "Ticari Mallar"),
+                    result.get("gerekce", result.get("gemini_reasoning", "")),
+                    result.get("guven_skoru", 0.80),
                     line["id"],
                 ),
             )
@@ -185,7 +185,7 @@ def classify_all_orders():
             classify_order(order_id)
             classified += 1
         except Exception as e:
-            print(f"[classify-all] siparis {order_id} atlandı: {e}")
+            print(f"[classify-all] siparis {order_id} atlandi: {str(e).encode('ascii', errors='replace').decode()}")
 
     return {"classified": classified, "total": len(pending_ids)}
 
