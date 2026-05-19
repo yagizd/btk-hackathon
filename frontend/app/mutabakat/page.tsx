@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchReconciliation, Reconciliation } from "@/src/lib/api";
 import Sidebar from "@/src/components/Sidebar";
 import PayoutWaterfall from "@/src/components/PayoutWaterfall";
+import ReconciliationAnalyst from "@/src/components/ReconciliationAnalyst";
 
 
 const TRY = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
@@ -155,6 +156,9 @@ export default function MutabakatPage() {
                 </p>
               </div>
             )}
+
+            {/* Agentic Reconciliation Analyst */}
+            <ReconciliationAnalyst marketplace={data.marketplace} />
 
             {/* Payout Waterfall (Gemini per-line analysis) */}
             {data.waterfall && data.waterfall.length > 0 && (

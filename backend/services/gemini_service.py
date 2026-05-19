@@ -165,6 +165,11 @@ def _reset_circuit():
     _quota_blocked_until = 0.0
 
 
+def force_reset_circuit():
+    """Public: agent gibi kasıtlı kullanıcı aksiyonlarında breaker'ı sıfırla."""
+    _reset_circuit()
+
+
 class GeminiQuotaError(Exception):
     """Devre kesici tarafından fırlatılır — caller fallback'a düşmeli."""
 

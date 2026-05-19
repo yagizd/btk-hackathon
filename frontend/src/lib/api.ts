@@ -19,6 +19,19 @@ export class LowConfidenceError extends Error {
   }
 }
 
+export class AgentUnreachableError extends Error {
+  trace: AgentTraceEntry[];
+  iterations: number;
+  upstream: string;
+  constructor(message: string, trace: AgentTraceEntry[], iterations: number, upstream: string) {
+    super(message);
+    this.name = "AgentUnreachableError";
+    this.trace = trace;
+    this.iterations = iterations;
+    this.upstream = upstream;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -28,13 +41,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     let body: unknown = null;
     try { body = await res.json(); } catch { /* non-JSON */ }
     const detail = (body as { detail?: unknown })?.detail;
-    if (
-      detail &&
-      typeof detail === "object" &&
-      (detail as { error?: string }).error === "low_confidence_lines"
-    ) {
-      const d = detail as { threshold: number; lines: LowConfidenceLine[]; message?: string };
-      throw new LowConfidenceError(d.threshold, d.lines, d.message);
+    if (detail && typeof detail === "object") {
+      const d = detail as { error?: string };
+      if (d.error === "low_confidence_lines") {
+        const ld = detail as { threshold: number; lines: LowConfidenceLine[]; message?: string };
+        throw new LowConfidenceError(ld.threshold, ld.lines, ld.message);
+      }
+      if (d.error === "gemini_unreachable") {
+        const ad = detail as { message: string; trace: AgentTraceEntry[]; iterations: number };
+        throw new AgentUnreachableError(
+          "Gemini'ye ulaşılamadı",
+          ad.trace ?? [],
+          ad.iterations ?? 0,
+          ad.message ?? "",
+        );
+      }
     }
     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }
@@ -172,6 +193,44 @@ export function nlQuery(question: string, sessionId?: string) {
 
 export function resetChatSession(sessionId: string) {
   return request<{ cleared: boolean }>(`/api/nl-query/${sessionId}`, { method: "DELETE" });
+}
+
+// ── Agent (tool-using) chat & analyst ───────────────────────────────────────
+
+export type AgentTraceEntry =
+  | { type: "tool_call"; name: string; args: Record<string, unknown> }
+  | { type: "tool_result"; name: string; result: unknown }
+  | { type: "model_note"; content: string }
+  | { type: "final"; content: string }
+  | { type: "error"; content: string }
+  | { type: "limit_reached"; content: string };
+
+export interface AgentChatResponse {
+  answer: string;
+  session_id: string;
+  trace: AgentTraceEntry[];
+  iterations: number;
+}
+
+export function agentChat(question: string, sessionId?: string) {
+  return request<AgentChatResponse>("/api/agent/chat", {
+    method: "POST",
+    body: JSON.stringify({ question, session_id: sessionId ?? null }),
+  });
+}
+
+export interface AgentReconciliationResponse {
+  marketplace: string;
+  summary: string;
+  trace: AgentTraceEntry[];
+  iterations: number;
+}
+
+export function agentReconciliation(marketplace = "Trendyol", question?: string) {
+  return request<AgentReconciliationResponse>("/api/agent/reconciliation", {
+    method: "POST",
+    body: JSON.stringify({ marketplace, question: question ?? null }),
+  });
 }
 
 export function fetchReturns() {

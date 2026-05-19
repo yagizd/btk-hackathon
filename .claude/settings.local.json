@@ -5,7 +5,12 @@
       "Bash(npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --eslint --yes)",
       "Bash(npm install *)",
       "Bash(python *)",
-      "Bash(curl -s -X POST -H \"Content-Type: application/json\" -d \"{\\\\\"question\\\\\":\\\\\"Bu ay en cok satan urun nedir?\\\\\"}\" http://127.0.0.1:8000/api/nl-query)"
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" -d \"{\\\\\"question\\\\\":\\\\\"Bu ay en cok satan urun nedir?\\\\\"}\" http://127.0.0.1:8000/api/nl-query)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $5}')",
+      "Bash(xargs -I {} taskkill //F //PID {})",
+      "Bash(tasklist)",
+      "Bash(awk '{print $2}')"
     ]
   }
 }
