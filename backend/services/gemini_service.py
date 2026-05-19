@@ -37,18 +37,27 @@ def _call_with_retry(fn):
 
 
 def smart_fallback(product_name: str) -> dict:
+    import re
     name = product_name.lower()
 
-    kdv1_keywords = ["süt", "bebek", "mama", "zeytinyağı", "zeytin yağı",
-                     "un", "ekmek", "yumurta", "peynir", "tereyağ",
-                     "makarna", "pirinç", "şeker", "tuz", "gazete", "dergi"]
+    def word_match(kw: str, text: str) -> bool:
+        """Kelime siniri kontrolu — 'un' samsung'u tetiklemesin."""
+        # Bosluk iceren ifadeler (orn. 'zeytin yagi') direkt substring ara
+        if " " in kw:
+            return kw in text
+        # Tek kelimeler icin kelime siniri kontrolu
+        return bool(re.search(r"(?<![a-z0-9])" + re.escape(kw) + r"(?![a-z0-9])", text))
 
-    kdv10_keywords = ["ilaç", "vitamin", "takviye", "şampuan", "saç",
-                      "krem", "losyon", "diş", "sabun", "deterjan",
+    kdv1_keywords = ["sut", "bebek", "mama", "zeytinyagi", "zeytin yagi",
+                     "un", "ekmek", "yumurta", "peynir", "tereyag",
+                     "makarna", "pirinc", "seker", "tuz", "gazete", "dergi"]
+
+    kdv10_keywords = ["ilac", "vitamin", "takviye", "sampuan", "sac",
+                      "krem", "losyon", "dis", "sabun", "deterjan",
                       "restoran", "kafe", "otel"]
 
     for kw in kdv1_keywords:
-        if kw in name:
+        if word_match(kw, name):
             return {
                 "kdv_orani": 1,
                 "hesap_kodu": "153",
@@ -58,7 +67,7 @@ def smart_fallback(product_name: str) -> dict:
             }
 
     for kw in kdv10_keywords:
-        if kw in name:
+        if word_match(kw, name):
             return {
                 "kdv_orani": 10,
                 "hesap_kodu": "153",
