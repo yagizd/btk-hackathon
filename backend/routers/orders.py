@@ -3,10 +3,24 @@ import os
 import random
 import string
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File
+from pydantic import BaseModel
 from database import get_db
 from models import OrderOut, OrderLineOut, ApproveRequest
 from services import gemini_service
+
+
+UNCERTAIN_THRESHOLD = 0.75
+
+
+class ApplyKdvRequest(BaseModel):
+    kdv_orani: int
+    hesap_kodu: Optional[str] = None
+    hesap_adi: Optional[str] = None
+    gerekce: Optional[str] = None
+    source: Optional[str] = "alternative"   # "alternative" | "manual" | "primary"
+    approve: bool = True                    # apply + onayla
 
 
 def _generate_invoice_number() -> str:
@@ -190,7 +204,237 @@ def classify_all_orders():
     return {"classified": classified, "total": len(pending_ids)}
 
 
+# ── POST /api/orders/from-image (Vision OCR) ─────────────────────────────────
+
+@router.post("/from-image")
+async def order_from_image(file: UploadFile = File(...)):
+    """
+    Bir fatura/sipariş fotoğrafını Gemini multimodal ile işler.
+    Yapılandırılmış kalem listesi + KDV önerileri döner. Henüz DB'ye yazılmaz —
+    kullanıcı 'Kaydet' butonuyla onaylar.
+    """
+    content_type = (file.content_type or "image/jpeg").lower()
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Yalnız görsel dosyalar kabul edilir.")
+
+    image_bytes = await file.read()
+    # 8 MB sınırı (Gemini inline parts için makul üst sınır)
+    if len(image_bytes) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Dosya boyutu 8 MB'ı aşıyor.")
+
+    result = gemini_service.extract_invoice_from_image(image_bytes, mime_type=content_type)
+    return result
+
+
+class SaveExtractedRequest(BaseModel):
+    customer_name: str = ""
+    customer_city: str = ""
+    lines: list[dict] = []
+    marketplace: str = "Manuel"
+    order_date: Optional[str] = None
+
+
+@router.post("/save-extracted")
+def save_extracted_order(body: SaveExtractedRequest):
+    """OCR ile çıkarılan kalemleri yeni bir manuel sipariş + sınıflandırılmış satırlar
+    olarak DB'ye yazar. user_approved=0 — kullanıcı dashboard'dan onaylayabilir.
+    """
+    if not body.lines:
+        raise HTTPException(status_code=400, detail="Kaydedilecek satır yok.")
+
+    order_date = body.order_date or datetime.now().isoformat()
+    marketplace_order_id = f"MNL-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(100,999)}"
+    gross = sum(float(l.get("quantity", 1)) * float(l.get("unit_price", 0)) for l in body.lines)
+
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO orders
+                 (marketplace, marketplace_order_id, customer_name, customer_city,
+                  is_company, is_return, gross_amount, commission, net_payout,
+                  classify_status, order_date)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                body.marketplace,
+                marketplace_order_id,
+                body.customer_name or "Manuel Müşteri",
+                body.customer_city or "",
+                0, 0, round(gross, 2), 0, round(gross, 2),
+                "classified",
+                order_date,
+            ),
+        )
+        order_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        for l in body.lines:
+            conn.execute(
+                """INSERT INTO order_lines
+                     (order_id, product_name, category, quantity, unit_price,
+                      gemini_kdv_rate, gemini_account_code, gemini_account_name,
+                      gemini_reasoning, gemini_confidence)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    order_id,
+                    str(l.get("product_name", "")),
+                    str(l.get("category", "OCR")),
+                    int(l.get("quantity", 1) or 1),
+                    float(l.get("unit_price", 0) or 0),
+                    int(l.get("kdv_orani", 20)),
+                    "153",
+                    "Ticari Mallar",
+                    str(l.get("gerekce", "")),
+                    float(l.get("guven_skoru", 0.75)),
+                ),
+            )
+
+    return {"order_id": order_id, "marketplace_order_id": marketplace_order_id, "line_count": len(body.lines)}
+
+
+# ── GET /api/orders/uncertain ────────────────────────────────────────────────
+
+@router.get("/uncertain")
+def list_uncertain_orders():
+    """
+    Düşük güvenli (confidence < UNCERTAIN_THRESHOLD) ve henüz onaylanmamış satıra
+    sahip siparişleri, mevcut alternatifleriyle birlikte döner.
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT DISTINCT o.*
+               FROM orders o
+               JOIN order_lines l ON l.order_id = o.id
+               WHERE o.is_return = 0
+                 AND l.gemini_confidence IS NOT NULL
+                 AND l.gemini_confidence < ?
+                 AND (l.user_approved IS NULL OR l.user_approved = 0)
+               ORDER BY o.order_date DESC""",
+            (UNCERTAIN_THRESHOLD,),
+        ).fetchall()
+
+        result = []
+        for row in rows:
+            order = dict(row)
+            lines = conn.execute(
+                "SELECT * FROM order_lines WHERE order_id=?", (order["id"],)
+            ).fetchall()
+            order_lines = []
+            for l in lines:
+                d = dict(l)
+                alt_raw = d.get("gemini_alternatives")
+                d["gemini_alternatives"] = json.loads(alt_raw) if alt_raw else []
+                order_lines.append(d)
+            order["lines"] = order_lines
+            result.append(order)
+    return result
+
+
+# ── POST /api/orders/classify-uncertain ──────────────────────────────────────
+
+@router.post("/classify-uncertain")
+def classify_uncertain():
+    """
+    Tüm düşük güvenli + onaylanmamış satırlar için Gemini'den alternatifli yeniden
+    öneri ister, primary + alternatives JSON'unu saklar.
+    """
+    with get_db() as conn:
+        lines = conn.execute(
+            """SELECT l.id, l.product_name, l.category
+               FROM order_lines l
+               JOIN orders o ON o.id = l.order_id
+               WHERE o.is_return = 0
+                 AND l.gemini_confidence IS NOT NULL
+                 AND l.gemini_confidence < ?
+                 AND (l.user_approved IS NULL OR l.user_approved = 0)""",
+            (UNCERTAIN_THRESHOLD,),
+        ).fetchall()
+
+    processed = 0
+    for l in lines:
+        try:
+            result = gemini_service.classify_kdv_with_alternatives(
+                l["product_name"] or "", l["category"] or ""
+            )
+            primary = result["primary"]
+            alts = result.get("alternatives", [])
+            with get_db() as conn:
+                conn.execute(
+                    """UPDATE order_lines SET
+                         gemini_kdv_rate=?, gemini_account_code=?, gemini_account_name=?,
+                         gemini_reasoning=?, gemini_confidence=?, gemini_alternatives=?
+                       WHERE id=?""",
+                    (
+                        primary["kdv_orani"],
+                        primary["hesap_kodu"],
+                        primary["hesap_adi"],
+                        primary["gerekce"],
+                        primary["guven_skoru"],
+                        json.dumps(alts, ensure_ascii=False),
+                        l["id"],
+                    ),
+                )
+            processed += 1
+        except Exception as e:
+            print(f"[classify-uncertain] line {l['id']} atlandı: {str(e).encode('ascii','replace').decode()}")
+
+    return {"processed": processed, "total": len(lines)}
+
+
+# ── POST /api/order-lines/{line_id}/apply-kdv ────────────────────────────────
+
+@router.post("/lines/{line_id}/apply-kdv")
+def apply_kdv(line_id: int, body: ApplyKdvRequest):
+    """Satır için seçilen KDV oranını uygular + opsiyonel olarak onaylar."""
+    with get_db() as conn:
+        line = conn.execute(
+            "SELECT id, order_id FROM order_lines WHERE id=?", (line_id,)
+        ).fetchone()
+        if not line:
+            raise HTTPException(status_code=404, detail="Satır bulunamadı")
+
+        approved = 1 if body.approve else 0
+        approved_at = datetime.now().isoformat() if body.approve else None
+
+        conn.execute(
+            """UPDATE order_lines SET
+                 gemini_kdv_rate=?,
+                 gemini_account_code=COALESCE(?, gemini_account_code),
+                 gemini_account_name=COALESCE(?, gemini_account_name),
+                 gemini_reasoning=COALESCE(?, gemini_reasoning),
+                 gemini_confidence=CASE WHEN ?=1 THEN 1.0 ELSE gemini_confidence END,
+                 user_approved=?,
+                 approved_at=?
+               WHERE id=?""",
+            (
+                body.kdv_orani,
+                body.hesap_kodu,
+                body.hesap_adi,
+                body.gerekce,
+                approved,
+                approved,
+                approved_at,
+                line_id,
+            ),
+        )
+
+        # Tüm satırlar onaylandıysa sipariş statüsünü 'approved' yap
+        if body.approve:
+            order_id = line["order_id"]
+            pending_count = conn.execute(
+                """SELECT COUNT(*) FROM order_lines
+                   WHERE order_id=? AND (user_approved IS NULL OR user_approved=0)""",
+                (order_id,),
+            ).fetchone()[0]
+            if pending_count == 0:
+                conn.execute(
+                    "UPDATE orders SET classify_status='approved' WHERE id=?", (order_id,)
+                )
+
+    return {"line_id": line_id, "kdv_orani": body.kdv_orani, "approved": body.approve}
+
+
 # ── POST /api/orders/{id}/approve ────────────────────────────────────────────
+
+CONFIDENCE_THRESHOLD = 0.7
+
 
 @router.post("/{order_id}/approve")
 def approve_order(order_id: int, body: ApproveRequest):
@@ -198,6 +442,35 @@ def approve_order(order_id: int, body: ApproveRequest):
         order = conn.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
         if not order:
             raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
+
+        # Confidence-gated: pozitif onay için düşük güvenli satırlar açıkça onaylanmalı
+        if body.approved and not body.force_low_confidence:
+            low_lines = conn.execute(
+                """SELECT id, product_name, gemini_kdv_rate, gemini_confidence, gemini_reasoning
+                   FROM order_lines
+                   WHERE order_id=? AND gemini_confidence IS NOT NULL
+                     AND gemini_confidence < ?""",
+                (order_id, CONFIDENCE_THRESHOLD),
+            ).fetchall()
+            if low_lines:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "low_confidence_lines",
+                        "message": "Düşük güvenli satırlar var; onaylamak için force_low_confidence=true gönderin.",
+                        "threshold": CONFIDENCE_THRESHOLD,
+                        "lines": [
+                            {
+                                "line_id": l["id"],
+                                "product_name": l["product_name"],
+                                "gemini_kdv_rate": l["gemini_kdv_rate"],
+                                "gemini_confidence": l["gemini_confidence"],
+                                "gemini_reasoning": l["gemini_reasoning"],
+                            }
+                            for l in low_lines
+                        ],
+                    },
+                )
 
         approved_val = 1 if body.approved else 0
         conn.execute(

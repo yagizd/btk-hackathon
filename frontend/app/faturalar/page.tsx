@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchInvoices, Invoice } from "@/src/lib/api";
+import { fetchInvoices, searchInvoices, Invoice } from "@/src/lib/api";
 import Sidebar from "@/src/components/Sidebar";
 
 
@@ -36,13 +36,44 @@ export default function FaturalarPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<Record<string, string | number> | null>(null);
+
+  async function reloadAll() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchInvoices();
+      setInvoices(data);
+      setActiveFilters(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    fetchInvoices()
-      .then(setInvoices)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    void reloadAll();
   }, []);
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setError(null);
+    try {
+      const res = await searchInvoices(q);
+      setInvoices(res.invoices);
+      setActiveFilters(res.filters);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
@@ -50,7 +81,54 @@ export default function FaturalarPage() {
 
       {/* Main content */}
       <main className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Faturalar</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-4">Faturalar</h1>
+
+        {/* NL Search */}
+        <form onSubmit={handleSearch} className="mb-6 flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Doğal dil ile ara — örn: 'Mayıs ayında Trendyol e-Fatura'"
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+            disabled={searching}
+          />
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={searching || !query.trim()}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {searching ? "Aranıyor…" : "Gemini ile Ara"}
+            </button>
+            {activeFilters && (
+              <button
+                type="button"
+                onClick={() => { setQuery(""); void reloadAll(); }}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Temizle
+              </button>
+            )}
+          </div>
+        </form>
+
+        {activeFilters && Object.keys(activeFilters).length > 0 && (
+          <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-indigo-700 font-medium">✦ Gemini çıkarımı:</span>
+            {Object.entries(activeFilters).map(([k, v]) => (
+              <span key={k} className="px-2 py-0.5 bg-white rounded-full text-gray-700 font-mono">
+                {k}={String(v)}
+              </span>
+            ))}
+            <span className="text-gray-500 ml-auto">{invoices.length} sonuç</span>
+          </div>
+        )}
+        {activeFilters && Object.keys(activeFilters).length === 0 && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-800">
+            Gemini sorgudan filtre çıkaramadı — tüm faturalar gösteriliyor.
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center h-40 text-gray-400">

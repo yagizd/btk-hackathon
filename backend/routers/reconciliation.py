@@ -18,11 +18,14 @@ def get_reconciliation():
 
     actual_payout = payout_data["actual_payout"]
 
-    # DB'deki Trendyol siparişlerinden beklenen tutarı hesapla
+    # DB'deki Trendyol siparişlerinden beklenen tutarı + komisyon kontrolü için detay
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT net_payout, is_return, marketplace_order_id
-               FROM orders WHERE marketplace='Trendyol'"""
+            """SELECT o.id, o.net_payout, o.is_return, o.marketplace_order_id,
+                      o.gross_amount, o.commission,
+                      (SELECT category FROM order_lines WHERE order_id=o.id LIMIT 1) as category
+               FROM orders o
+               WHERE o.marketplace='Trendyol'"""
         ).fetchall()
 
     order_summary = []
@@ -33,18 +36,28 @@ def get_reconciliation():
         order_summary.append({
             "order_id": row["marketplace_order_id"],
             "net_payout": net,
+            "gross_amount": row["gross_amount"],
+            "commission": row["commission"],
+            "category": row["category"] or "",
             "is_return": bool(row["is_return"]),
         })
 
     difference = round(actual_payout - expected, 2)
 
-    # Gemini açıklaması
-    explanation = gemini_service.explain_reconciliation(
+    # Gemini analizi (structured output: explanation + severity + root_cause + action + commission_check)
+    analysis = gemini_service.explain_reconciliation(
         expected_amount=expected,
         actual_amount=actual_payout,
         difference=difference,
         payout_json=payout_data,
         order_summary=order_summary,
+        marketplace="Trendyol",
+    )
+
+    # Payout waterfall: her kaleme açıklama + anomaly flag
+    waterfall = gemini_service.analyze_payout_waterfall(
+        payout_lines=payout_data.get("payout_lines", []),
+        marketplace="Trendyol",
     )
 
     return {
@@ -54,6 +67,11 @@ def get_reconciliation():
         "actual_amount": actual_payout,
         "difference": difference,
         "payout_lines": payout_data.get("payout_lines", []),
-        "gemini_explanation": explanation,
+        "waterfall": waterfall,
+        "gemini_explanation": analysis.get("explanation"),
+        "severity": analysis.get("severity"),
+        "root_cause": analysis.get("root_cause"),
+        "suggested_action": analysis.get("suggested_action"),
+        "commission_check": analysis.get("commission_check"),
         "status": "reconciled" if abs(difference) < 1 else "discrepancy",
     }

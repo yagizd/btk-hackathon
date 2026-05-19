@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchOrders, approveOrder, Order } from "@/src/lib/api";
-
-const BASE_URL = "http://127.0.0.1:8000";
+import {
+  fetchOrders,
+  approveOrder,
+  Order,
+  LowConfidenceError,
+  LowConfidenceLine,
+  BASE_URL,
+} from "@/src/lib/api";
 
 const TRY = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 
@@ -26,6 +31,13 @@ export default function OrdersTable() {
   const [invoicing, setInvoicing] = useState<Set<number>>(new Set());
   const [invoiced, setInvoiced] = useState<Set<number>>(new Set());
 
+  // Düşük güven onay modali
+  const [lowConfirm, setLowConfirm] = useState<{
+    order: Order;
+    lines: LowConfidenceLine[];
+    threshold: number;
+  } | null>(null);
+
   useEffect(() => {
     fetchOrders()
       .then((data) => setOrders(data.filter((o) => !o.is_return)))
@@ -33,13 +45,18 @@ export default function OrdersTable() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleApprove(order: Order) {
+  async function doApprove(order: Order, force: boolean) {
     setApproving((prev) => new Set(prev).add(order.id));
     try {
-      await approveOrder(order.id);
+      await approveOrder(order.id, force);
       setApproved((prev) => new Set(prev).add(order.id));
+      setLowConfirm(null);
     } catch (e) {
-      alert(`Onaylama hatası: ${(e as Error).message}`);
+      if (e instanceof LowConfidenceError) {
+        setLowConfirm({ order, lines: e.lines, threshold: e.threshold });
+      } else {
+        alert(`Onaylama hatası: ${(e as Error).message}`);
+      }
     } finally {
       setApproving((prev) => {
         const next = new Set(prev);
@@ -47,6 +64,10 @@ export default function OrdersTable() {
         return next;
       });
     }
+  }
+
+  function handleApprove(order: Order) {
+    void doApprove(order, false);
   }
 
   async function handleGenerateInvoice(order: Order) {
@@ -93,6 +114,55 @@ export default function OrdersTable() {
   }
 
   return (
+    <>
+    {lowConfirm && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="bg-white rounded-xl shadow-xl border border-gray-100 max-w-lg w-full p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <svg className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-5a1 1 0 00-1 1v2a1 1 0 002 0V9a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <h3 className="text-base font-semibold text-gray-800">Düşük Güvenli Satırlar</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Bu sipariş için Gemini'nin güven skoru %{(lowConfirm.threshold * 100).toFixed(0)} altında.
+                Onaylamak için aşağıdaki KDV önerilerini gözden geçirin.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+            {lowConfirm.lines.map((l) => (
+              <div key={l.line_id} className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-800 truncate" title={l.product_name}>{l.product_name}</span>
+                  <span className="text-xs font-mono text-amber-700 shrink-0 ml-2">
+                    KDV %{l.gemini_kdv_rate ?? "—"} · {l.gemini_confidence?.toFixed(2) ?? "—"}
+                  </span>
+                </div>
+                {l.gemini_reasoning && (
+                  <p className="text-xs text-gray-600 mt-1 italic">"{l.gemini_reasoning}"</p>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setLowConfirm(null)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Vazgeç
+            </button>
+            <button
+              onClick={() => doApprove(lowConfirm.order, true)}
+              disabled={approving.has(lowConfirm.order.id)}
+              className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50"
+            >
+              {approving.has(lowConfirm.order.id) ? "Onaylanıyor…" : "Yine de Onayla"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="overflow-x-auto rounded-xl shadow-sm border border-gray-100">
       <table className="min-w-full bg-white text-sm">
         <thead>
@@ -201,5 +271,6 @@ export default function OrdersTable() {
         </tbody>
       </table>
     </div>
+    </>
   );
 }
