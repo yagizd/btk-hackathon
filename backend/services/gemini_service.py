@@ -40,21 +40,41 @@ def smart_fallback(product_name: str) -> dict:
     import re
     name = product_name.lower()
 
+    def normalize(s: str) -> str:
+        """Turkce karakterleri ASCII'ye donustur: sut, seker, sac, ilac..."""
+        import unicodedata
+        tr_map = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+        return unicodedata.normalize("NFC", s).translate(tr_map)
+
     def word_match(kw: str, text: str) -> bool:
-        """Kelime siniri kontrolu — 'un' samsung'u tetiklemesin."""
-        # Bosluk iceren ifadeler (orn. 'zeytin yagi') direkt substring ara
-        if " " in kw:
-            return kw in text
-        # Tek kelimeler icin kelime siniri kontrolu
-        return bool(re.search(r"(?<![a-z0-9])" + re.escape(kw) + r"(?![a-z0-9])", text))
+        """Her iki taraf normalize edilir, sonra kelime siniri kontrolu yapilir.
+        Boylece 'sut' hem 'sut' hem 'sut' icindeki 'sut' ile eslesir,
+        ama 'samsung' icindeki 'un' ile eslesmez."""
+        nkw  = normalize(kw)
+        ntext = normalize(text)
+        if " " in nkw:
+            return nkw in ntext
+        # Sadece kelime BASI kontrolu: oncesinde harf/rakam olmamali.
+        # Sonrasina bakilmaz — Turkce ekler (sututu, saclar vb.) da eslesin.
+        # "un" samsung'da eslesmiyor cunku oncesinde "s" var.
+        return bool(re.search(r"(?<![a-z0-9])" + re.escape(nkw), ntext))
 
-    kdv1_keywords = ["sut", "bebek", "mama", "zeytinyagi", "zeytin yagi",
-                     "un", "ekmek", "yumurta", "peynir", "tereyag",
-                     "makarna", "pirinc", "seker", "tuz", "gazete", "dergi"]
+    kdv1_keywords = [
+        "sut", "bebek", "mama",
+        "zeytinyagi", "zeytin yagi",
+        "un", "ekmek", "yumurta",
+        "peynir", "tereyag",
+        "makarna", "pirinc", "seker", "tuz",
+        "gazete", "dergi",
+    ]
 
-    kdv10_keywords = ["ilac", "vitamin", "takviye", "sampuan", "sac",
-                      "krem", "losyon", "dis", "sabun", "deterjan",
-                      "restoran", "kafe", "otel"]
+    kdv10_keywords = [
+        "ilac", "vitamin", "takviye",
+        "sampuan", "sac",
+        "krem", "losyon",
+        "dis", "sabun", "deterjan",
+        "restoran", "kafe", "otel",
+    ]
 
     for kw in kdv1_keywords:
         if word_match(kw, name):
